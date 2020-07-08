@@ -1,7 +1,7 @@
 # postman2jmx
 Postman collection to Jmeter jmx file converter.
 
-[![Build Status](https://travis-ci.com/github/eduardomioto/postman2jmx.svg?branch=master)](https://travis-ci.com/github/eduardomioto/postman2jmx)
+[![Build Status](https://api.travis-ci.com/eduardomioto/postman2jmx.svg?branch=master)](https://travis-ci.com/github/eduardomioto/postman2jmx)
 
 
 ### Note
