@@ -1,2 +1,5 @@
 language: java
 script: mvn install -DskipTests=true
+addons:
+  code_climate:
+    repo_token: b49a67f488afc5cf8a2b1b5765bfa41e193e30adc7b5bf69005014514cf49670

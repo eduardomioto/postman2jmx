@@ -2,7 +2,8 @@
 Postman collection to Jmeter jmx file converter.
 
 [![Build Status](https://api.travis-ci.com/eduardomioto/postman2jmx.svg?branch=master)](https://travis-ci.com/github/eduardomioto/postman2jmx)
-
+[![Maintainability](https://api.codeclimate.com/v1/badges/bcb3647ef40cccaaef3b/maintainability)](https://codeclimate.com/github/eduardomioto/postman2jmx/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/bcb3647ef40cccaaef3b/test_coverage)](https://codeclimate.com/github/eduardomioto/postman2jmx/test_coverage)
 
 ### Note
 
