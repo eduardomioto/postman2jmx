@@ -1,34 +1,38 @@
 package com.loadium.postman2jmx.utils;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.loadium.postman2jmx.model.postman.PostmanCollection;
 import com.loadium.postman2jmx.model.postman.PostmanItem;
-import org.apache.commons.lang3.StringUtils;
-
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class PostmanCollectionUtils {
 
-    private static void getItem(PostmanItem item, List<PostmanItem> itemList) {
-        if (item.getItems().size() == 0 && item.getRequest() != null) {
-            itemList.add(item);
-        }
+	private static void getItem(PostmanItem item, List<PostmanItem> itemList, String folderName) {
 
-        for (PostmanItem i : item.getItems()) {
-            getItem(i, itemList);
-        }
-    }
+		if (item.getItems().size() == 0 && item.getRequest() != null) {
+			final String index = getIndex(itemList);
+			item.setName(index + "_" +  folderName + "_" + item.getName());
+			itemList.add(item);
+		} else {
+			folderName = item.getName();
+		}
 
-    public static List<PostmanItem> getItems(PostmanCollection postmanCollection) {
-        List<PostmanItem> items = new ArrayList<>();
+		for (final PostmanItem i : item.getItems()) {
+			getItem(i, itemList, folderName);
+		}
+	}
 
-        for (PostmanItem item : postmanCollection.getItems()) {
-            getItem(item, items);
-        }
-        return items;
-    }
+	private static String getIndex(List<PostmanItem> itemList) {
+		return String.format("%03d", itemList.size() + 1);
+	}
+
+	public static List<PostmanItem> getItems(PostmanCollection postmanCollection) {
+		final List<PostmanItem> items = new ArrayList<>();
+
+		for (final PostmanItem item : postmanCollection.getItems()) {
+			getItem(item, items, null);
+		}
+		return items;
+	}
 }
