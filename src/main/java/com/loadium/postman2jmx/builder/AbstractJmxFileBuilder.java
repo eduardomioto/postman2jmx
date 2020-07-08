@@ -1,13 +1,16 @@
 package com.loadium.postman2jmx.builder;
 
-import com.loadium.postman2jmx.config.Postman2JmxConfig;
-import com.loadium.postman2jmx.exception.NoPostmanCollectionItemException;
-import com.loadium.postman2jmx.exception.NullPostmanCollectionException;
-import com.loadium.postman2jmx.model.jmx.*;
-import com.loadium.postman2jmx.model.postman.PostmanCollection;
-import com.loadium.postman2jmx.model.postman.PostmanItem;
-import org.apache.jmeter.config.Argument;
-import org.apache.jmeter.config.Arguments;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.jmeter.control.LoopController;
 import org.apache.jmeter.extractor.json.jsonpath.JSONPostProcessor;
 import org.apache.jmeter.protocol.http.control.HeaderManager;
@@ -16,17 +19,36 @@ import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.testelement.TestPlan;
 import org.apache.jmeter.threads.ThreadGroup;
 import org.apache.jorphan.collections.HashTree;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.loadium.postman2jmx.config.Postman2JmxConfig;
+import com.loadium.postman2jmx.exception.NoPostmanCollectionItemException;
+import com.loadium.postman2jmx.exception.NullPostmanCollectionException;
+import com.loadium.postman2jmx.model.jmx.JmxFile;
+import com.loadium.postman2jmx.model.jmx.JmxHeaderManager;
+import com.loadium.postman2jmx.model.jmx.JmxJsonPostProcessor;
+import com.loadium.postman2jmx.model.jmx.JmxLoopController;
+import com.loadium.postman2jmx.model.jmx.JmxTestPlan;
+import com.loadium.postman2jmx.model.jmx.JmxThreadGroup;
+import com.loadium.postman2jmx.model.postman.PostmanCollection;
+import com.loadium.postman2jmx.model.postman.PostmanItem;
 
+/**
+ * The Class AbstractJmxFileBuilder.
+ */
 public abstract class AbstractJmxFileBuilder implements IJmxFileBuilder {
 
+    private static Logger logger = LoggerFactory.getLogger(AbstractJmxFileBuilder.class.getName());
+
+    /**
+     * Builds the jmx file.
+     *
+     * @param postmanCollection the postman collection
+     * @param jmxOutputFilePath the jmx output file path
+     * @return the jmx file
+     * @throws Exception the exception
+     */
     protected JmxFile buildJmxFile(PostmanCollection postmanCollection, String jmxOutputFilePath) throws Exception {
         if (postmanCollection == null) {
             throw new NullPostmanCollectionException();
@@ -36,36 +58,37 @@ public abstract class AbstractJmxFileBuilder implements IJmxFileBuilder {
             throw new NoPostmanCollectionItemException();
         }
 
-        Postman2JmxConfig config = new Postman2JmxConfig();
+        final Postman2JmxConfig config = new Postman2JmxConfig();
         config.setJMeterHome();
 
         // TestPlan
-        TestPlan testPlan = JmxTestPlan.newInstance(postmanCollection.getInfo() != null ? postmanCollection.getInfo().getName() : "");
+        final TestPlan testPlan = JmxTestPlan.newInstance(postmanCollection.getInfo() != null ? postmanCollection.getInfo().getName() : "");
 
         // ThreadGroup controller
-        LoopController loopController = JmxLoopController.newInstance();
+        final LoopController loopController = JmxLoopController.newInstance();
 
         // ThreadGroup
-        ThreadGroup threadGroup = JmxThreadGroup.newInstance(loopController);
+        final ThreadGroup threadGroup = JmxThreadGroup.newInstance(loopController);
 
         // HTTPSamplerProxy
-        List<HTTPSamplerProxy> httpSamplerProxies = new ArrayList<>();
-        List<HeaderManager> headerManagers = new ArrayList<>();
+        final List<HTTPSamplerProxy> httpSamplerProxies = new ArrayList<>();
+        final List<HeaderManager> headerManagers = new ArrayList<>();
 
-        for (PostmanItem item : postmanCollection.getItems()) {
-          /*  if (!item.getEvent().isEmpty()) {
-                continue;
-            }*/
+        for (final PostmanItem item : postmanCollection.getItems()) {
 
-            IJmxBodyBuilder bodyBuilder = JmxBodyBuilderFactory.getJmxBodyBuilder(item);
-            HTTPSamplerProxy httpSamplerProxy = bodyBuilder.buildJmxBody(item);
+            final IJmxBodyBuilder bodyBuilder = JmxBodyBuilderFactory.getJmxBodyBuilder(item);
+            final HTTPSamplerProxy httpSamplerProxy = bodyBuilder.buildJmxBody(item);
             httpSamplerProxies.add(httpSamplerProxy);
 
             headerManagers.add(JmxHeaderManager.newInstance(item.getName(), item.getRequest().getHeaders()));
         }
 
+        for (final HeaderManager headerManager : headerManagers) {
+            logger.info("Header Manager Name: {}", headerManager.getName());
+        }
+
         // Create TestPlan hash tree
-        HashTree testPlanHashTree = new HashTree();
+        final HashTree testPlanHashTree = new HashTree();
         testPlanHashTree.add(testPlan);
 
         // Add ThreadGroup to TestPlan hash tree
@@ -80,41 +103,57 @@ public abstract class AbstractJmxFileBuilder implements IJmxFileBuilder {
 
         // Add Java Sampler to ThreadGroup hash tree
         for (int i = 0; i < httpSamplerProxies.size(); i++) {
-            HTTPSamplerProxy httpSamplerProxy = httpSamplerProxies.get(i);
-            HeaderManager headerManager = headerManagers.get(i);
+            final HTTPSamplerProxy httpSamplerProxy = httpSamplerProxies.get(i);
+            final HeaderManager headerManager = headerManagers.get(i);
+
+            logger.info("Java Sampler : {}", headerManager.getName());
 
             httpSamplerHashTree = threadGroupHashTree.add(httpSamplerProxy);
 
             headerHashTree = new HashTree();
             headerHashTree = httpSamplerHashTree.add(headerManager);
 
-            PostmanItem postmanItem = postmanCollection.getItems().get(i);
+            final PostmanItem postmanItem = postmanCollection.getItems().get(i);
             if (!postmanItem.getEvents().isEmpty()) {
-                List<JSONPostProcessor> jsonPostProcessors = JmxJsonPostProcessor.getJsonPostProcessors(postmanItem);
+                final List<JSONPostProcessor> jsonPostProcessors = JmxJsonPostProcessor.getJsonPostProcessors(postmanItem);
                 httpSamplerHashTree.add(jsonPostProcessors);
             }
         }
 
-        File file = new File(jmxOutputFilePath);
-        OutputStream os = new FileOutputStream(file);
+        final JmxFile jmxFile = saveJMXFile(jmxOutputFilePath, testPlanHashTree);
+
+        return jmxFile;
+    }
+
+    /**
+     * Save JMX file.
+     *
+     * @param jmxOutputFilePath the jmx output file path
+     * @param testPlanHashTree the test plan hash tree
+     * @return the jmx file
+     * @throws FileNotFoundException the file not found exception
+     * @throws IOException Signals that an I/O exception has occurred.
+     */
+    private JmxFile saveJMXFile(String jmxOutputFilePath, final HashTree testPlanHashTree) throws FileNotFoundException, IOException {
+        final File file = new File(jmxOutputFilePath);
+        final OutputStream os = new FileOutputStream(file);
         SaveService.saveTree(testPlanHashTree, os);
 
-        InputStream is = new FileInputStream(file);
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
+        final InputStream is = new FileInputStream(file);
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        final byte[] buffer = new byte[1024];
 
         for (int len = 0; (len = is.read(buffer)) != -1; ) {
             bos.write(buffer, 0, len);
         }
         bos.flush();
 
-        byte[] data = bos.toByteArray();
-        JmxFile jmxFile = new JmxFile(data, testPlanHashTree);
+        final byte[] data = bos.toByteArray();
+        final JmxFile jmxFile = new JmxFile(data, testPlanHashTree);
 
         os.close();
         is.close();
         bos.close();
-
         return jmxFile;
     }
 
